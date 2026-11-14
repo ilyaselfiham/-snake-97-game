@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Game - Nokia Style</title>
+
+    <style>
+        /* Basic page design */
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #171d19;
+            font-family: Arial, sans-serif;
+            color: #edf1e9;
+            padding: 20px;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #aab5a8;
+            font-size: 12px;
+            letter-spacing: 3px;
+            margin-bottom: 14px;
+        }
+
+        /* Phone body, inspired by old Nokia phones */
+        .phone {
+            background: #b9c5a2;
+            border: 3px solid #e2e8d7;
+            border-radius: 32px 32px 45px 45px;
+            padding: 25px 22px;
+            color: #263326;
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.45);
+        }
+
+        .phone-name {
+            color: #53634b;
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 5px;
+            margin: 0 0 18px;
+        }
+
+        .screen-frame {
+            background: #71865a;
+            padding: 12px;
+            border-radius: 10px;
+        }
+
+        .screen {
+            background: #9bbc0f;
+            border: 3px solid #344b25;
+            padding: 9px;
+            color: #0f380f;
+        }
+
+        .score-line {
+            display: flex;
+            justify-content: space-between;
+            font-family: "Courier New", monospace;
+            font-size: 12px;
+            font-weight: bold;
+            padding-bottom: 8px;
+        }
+
+        canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            background: #9bbc0f;
+            border: 2px solid #42612c;
+            image-rendering: pixelated;
+            touch-action: none;
+        }
+
+        #gameMessage {
+            min-height: 22px;
+            margin-top: 8px;
+            font: bold 11px "Courier New", monospace;
+        }
+
+        /* Buttons */
+        .buttons {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 22px;
+            margin-top: 22px;
+        }
+
+        button {
+            border: none;
+            border-radius: 9px;
+            padding: 12px 17px;
+            background: linear-gradient(#64745d, #3d4c39);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #263126;
+        }
+
+        button:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #263126;
+        }
+
+        .direction-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 40px);
+            grid-template-rows: repeat(2, 36px);
+            gap: 5px;
+        }
+
+        .direction-pad button {
+            padding: 0;
+            font-size: 17px;
+        }
+
+        .up {
+            grid-column: 2;
+        }
+
+        .left {
+            grid-column: 1;
+            grid-row: 2;
+        }
+
+        .down {
+            grid-column: 2;
+            grid-row: 2;
+        }
+
+        .right {
+            grid-column: 3;
+            grid-row: 2;
+        }
+
+        .instructions {
+            color: #aab5a8;
+            font-size: 12px;
+            line-height: 1.6;
+            margin-top: 18px;
+        }
+
+        @media (max-width: 380px) {
+            .phone {
+                padding: 18px 14px;
+            }
+
+            .buttons {
+                gap: 12px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="game-container">
+
+        <p class="subtitle">A CLASSIC GAME FROM THE 90s</p>
+
+        <section class="phone">
+            <h1 class="phone-name">NOKIA</h1>
+
+            <div class="screen-frame">
+                <div class="screen">
+
+                    <div class="score-line">
+                        <span>SCORE: <span id="score">000</span></span>
+                        <span>BEST: <span id="bestScore">000</span></span>
+                    </div>
+
+                    <canvas id="gameCanvas" width="300" height="300"></canvas>
+
+                    <div id="gameMessage">PRESS START TO PLAY</div>
+
+                </div>
+            </div>
+
+            <div class="buttons">
+                <button id="startButton">START / PAUSE</button>
+
+                <div class="direction-pad">
+                    <button class="up" data-direction="up">▲</button>
+                    <button class="left" data-direction="left">◀</button>
+                    <button class="down" data-direction="down">▼</button>
+                    <button class="right" data-direction="right">▶</button>
+                </div>
+            </div>
+        </section>
+
+        <p class="instructions">
+            Use the arrow keys or WASD to move.<br>
+            Eat the food and try not to hit the walls or yourself.
+            You can also use the buttons on the screen.
+        </p>
+
+    </main>
+
+    <script>
+        // Getting the HTML elements that we need
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        const scoreText = document.getElementById("score");
+        const bestText = document.getElementById("bestScore");
+        const message = document.getElementById("gameMessage");
+        const startButton = document.getElementById("startButton");
+
+        // Each square of the game is 15 pixels
+        const cellSize = 15;
+        const numberOfCells = canvas.width / cellSize;
+
+        let snake = [];
+        let food = {};
+        let score = 0;
+
+        // Current direction and direction selected by the player
+        let direction = { x: 1, y: 0 };
+        let nextDirection = { x: 1, y: 0 };
+
+        let gameInterval = null;
+        let gameRunning = false;
+        let gameOver = false;
+
+        // Save the best score in the browser
+        let bestScore = Number(localStorage.getItem("snakeBestScore")) || 0;
+        bestText.textContent = formatScore(bestScore);
+
+        function formatScore(value) {
+            return String(value).padStart(3, "0");
+        }
+
+        // Start a new game and put the snake in the middle
+        function resetGame() {
+            snake = [
+                { x: 10, y: 10 },
+                { x: 9, y: 10 },
+                { x: 8, y: 10 }
+            ];
+
+            direction = { x: 1, y: 0 };
+            nextDirection = { x: 1, y: 0 };
+
+            score = 0;
+            gameOver = false;
+            scoreText.textContent = formatScore(score);
+
+            createFood();
+            drawGame();
+
+            message.textContent = "PRESS START TO PLAY";
+        }
+
+        // Generate food at a random position, not on the snake
+        function createFood() {
+            let positionIsFree = false;
+
+            while (!positionIsFree) {
+                food = {
+                    x: Math.floor(Math.random() * numberOfCells),
+                    y: Math.floor(Math.random() * numberOfCells)
+                };
+
+                positionIsFree = !snake.some(function (part) {
+                    return part.x === food.x && part.y === food.y;
+                });
+            }
+        }
+
+        // Draw the board, food and snake
+        function drawGame() {
+            ctx.fillStyle = "#9bbc0f";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Small grid to give the screen an old LCD look
+            ctx.strokeStyle = "rgba(15, 56, 15, 0.07)";
+
+            for (let i = 0; i <= numberOfCells; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * cellSize, 0);
+                ctx.lineTo(i * cellSize, canvas.height);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(0, i * cellSize);
+                ctx.lineTo(canvas.width, i * cellSize);
+                ctx.stroke();
+            }
+
+            // Draw the food
+            ctx.fillStyle = "#0f380f";
+            ctx.fillRect(
+                food.x * cellSize + 4,
+                food.y * cellSize + 4,
+                7,
+                7
+            );
+
+            // Draw every part of the snake
+            for (let i = 0; i < snake.length; i++) {
+                const part = snake[i];
+
+                if (i === 0) {
+                    ctx.fillStyle = "#0f380f"; // Head
+                } else {
+                    ctx.fillStyle = "#306230"; // Body
+                }
+
+                ctx.fillRect(
+                    part.x * cellSize + 1,
+                    part.y * cellSize + 1,
+                    cellSize - 2,
+                    cellSize - 2
+                );
+
+                // Two small pixels for the eyes
+                if (i === 0) {
+                    ctx.fillStyle = "#9bbc0f";
+
+                    if (direction.x !== 0) {
+                        const eyeX = part.x * cellSize + (direction.x > 0 ? 10 : 3);
+                        ctx.fillRect(eyeX, part.y * cellSize + 4, 2, 2);
+                        ctx.fillRect(eyeX, part.y * cellSize + 9, 2, 2);
+                    } else {
+                        const eyeY = part.y * cellSize + (direction.y > 0 ? 10 : 3);
+                        ctx.fillRect(part.x * cellSize + 4, eyeY, 2, 2);
+                        ctx.fillRect(part.x * cellSize + 9, eyeY, 2, 2);
+                    }
+                }
+            }
+        }
+
+        // One movement of the snake
+        function updateGame() {
+            direction = { x: nextDirection.x, y: nextDirection.y };
+
+            const head = {
+                x: snake[0].x + direction.x,
+                y: snake[0].y + direction.y
+            };
+
+            const eatingFood = head.x === food.x && head.y === food.y;
+
+            // If the snake is not eating, its last part moves away.
+            // This means the new head can move into the old tail position.
+            let bodyToCheck = eatingFood ? snake : snake.slice(0, -1);
+
+            // Check collision with the wall or with the snake itself
+            const hitWall =
+                head.x < 0 ||
+                head.y < 0 ||
+                head.x >= numberOfCells ||
+                head.y >= numberOfCells;
+
+            const hitSnake = bodyToCheck.some(function (part) {
+                return part.x === head.x && part.y === head.y;
+            });
+
+            if (hitWall || hitSnake) {
+                finishGame();
+                return;
+            }
+
+            snake.unshift(head);
+
+            if (eatingFood) {
+                score += 10;
+                scoreText.textContent = formatScore(score);
+
+                // Update the record if the player gets a better score
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestText.textContent = formatScore(bestScore);
+                    localStorage.setItem("snakeBestScore", bestScore);
+                }
+
+                createFood();
+            } else {
+                snake.pop();
+            }
+
+            drawGame();
+        }
+
+        function startPauseGame() {
+            // If the previous game ended, start again from the beginning
+            if (gameOver) {
+                resetGame();
+            }
+
+            gameRunning = !gameRunning;
+            clearInterval(gameInterval);
+
+            if (gameRunning) {
+                message.textContent = "GAME RUNNING";
+
+                // The game gets a little faster when the score increases
+                const speed = Math.max(65, 145 - score / 5);
+                gameInterval = setInterval(updateGame, speed);
+            } else {
+                message.textContent = "PAUSED";
+            }
+        }
+
+        function finishGame() {
+            gameRunning = false;
+            gameOver = true;
+            clearInterval(gameInterval);
+            message.textContent = "GAME OVER - PRESS START";
+        }
+
+        // Change direction, but do not allow a 180 degree turn
+        function changeDirection(newDirection) {
+            const directions = {
+                up: { x: 0, y: -1 },
+                down: { x: 0, y: 1 },
+                left: { x: -1, y: 0 },
+                right: { x: 1, y: 0 }
+            };
+
+            const selected = directions[newDirection];
+
+            if (!selected) {
+                return;
+            }
+
+            const isOpposite =
+                selected.x === -direction.x &&
+                selected.y === -direction.y;
+
+            if (!isOpposite) {
+                nextDirection = selected;
+            }
+        }
+
+        // Keyboard controls
+        document.addEventListener("keydown", function (event) {
+            const keys = {
+                ArrowUp: "up",
+                ArrowDown: "down",
+                ArrowLeft: "left",
+                ArrowRight: "right",
+                w: "up",
+                W: "up",
+                s: "down",
+                S: "down",
+                a: "left",
+                A: "left",
+                d: "right",
+                D: "right"
+            };
+
+            if (keys[event.key]) {
+                event.preventDefault();
+                changeDirection(keys[event.key]);
+            }
+
+            if (event.code === "Space") {
+                event.preventDefault();
+                startPauseGame();
+            }
+        });
+
+        // Buttons for phones and tablets
+        const directionButtons = document.querySelectorAll("[data-direction]");
+
+        directionButtons.forEach(function (button) {
+            button.addEventListener("click", function () {
+                changeDirection(button.dataset.direction);
+            });
+        });
+
+        startButton.addEventListener("click", startPauseGame);
+
+        // Swipe controls on the game screen
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        canvas.addEventListener("pointerdown", function (event) {
+            touchStartX = event.clientX;
+            touchStartY = event.clientY;
+        });
+
+        canvas.addEventListener("pointerup", function (event) {
+            const differenceX = event.clientX - touchStartX;
+            const differenceY = event.clientY - touchStartY;
+
+            if (Math.max(Math.abs(differenceX), Math.abs(differenceY)) > 18) {
+                if (Math.abs(differenceX) > Math.abs(differenceY)) {
+                    changeDirection(differenceX > 0 ? "right" : "left");
+                } else {
+                    changeDirection(differenceY > 0 ? "down" : "up");
+                }
+            }
+        });
+
+        // Prepare the game when the page loads
+        resetGame();
+    </script>
+</body>
+</html>
